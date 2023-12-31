@@ -6,9 +6,9 @@ from ezmup import Ezmup, get_coord_data, plot_coord_data
 
 
 class AttentionLayer(nn.Module):
-    def __init__(self, hidden_dim, head_dim):
+    def __init__(self, hidden_dim):
         super(AttentionLayer, self).__init__()
-        self.head_dim = head_dim
+        self.hidden_dim = hidden_dim
         # The query, key, and value layers now map from 'hidden_dim' to 'hidden_dim'
         self.query = nn.Linear(hidden_dim, hidden_dim)
         self.key = nn.Linear(hidden_dim, hidden_dim)
@@ -18,16 +18,16 @@ class AttentionLayer(nn.Module):
         Q = self.query(x)
         K = self.key(x)
         V = self.value(x)
-        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.head_dim
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.hidden_dim
         attention = F.softmax(attention_scores, dim=-1)
         return torch.matmul(attention, V)
 
 
 class MyModel(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim, head_dim, num_layers):
+    def __init__(self, input_dim, output_dim, hidden_dim, num_layers):
         super(MyModel, self).__init__()
         self.layers = nn.ModuleList(
-            [AttentionLayer(hidden_dim, head_dim) for _ in range(num_layers)]
+            [AttentionLayer(hidden_dim) for _ in range(num_layers)]
         )
         self.fin = nn.Linear(input_dim, hidden_dim)
         self.fout = nn.Linear(hidden_dim, output_dim)
@@ -44,7 +44,7 @@ class MyModel(nn.Module):
 
 
 model = MyModel(
-    input_dim=41, output_dim=41, hidden_dim=47 * 2, head_dim=47, num_layers=2
+    input_dim=41, output_dim=41, hidden_dim=47, num_layers=4
 )
 model.to("cuda:0")
 
