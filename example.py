@@ -18,7 +18,7 @@ class AttentionLayer(nn.Module):
         Q = self.query(x)
         K = self.key(x)
         V = self.value(x)
-        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.head_dim**0.5
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.head_dim
         attention = F.softmax(attention_scores, dim=-1)
         return torch.matmul(attention, V)
 
@@ -34,9 +34,11 @@ class MyModel(nn.Module):
 
     def forward(self, x):
         x = self.fin(x)
+        x = nn.ReLU()(x)
         print(x.shape)
         for layer in self.layers:
             x = layer(x)
+            x = nn.ReLU()(x)
         x = self.fout(x)
         return x
 
