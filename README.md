@@ -96,8 +96,9 @@ optimizer = Adam(optimizer_groups, **kwargs)
 
 # List of hyperparameters
 
+Not all hyperparameters are relevant to muP. Here is the list of hyperparameters that are relevant to muP:
 
-![Alt text](contents/image-1.png)
+![Alt text](contents/hyperparams.png)
 
 ## So what is with the prime number?
 
