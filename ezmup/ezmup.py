@@ -8,7 +8,7 @@ import torch
 from torch.optim import Adam
 
 SPECTRAL_SIGMA = lambda fin, fout, initstd: (initstd / math.sqrt(fin)) * min(
-    1, math.sqrt(fout / fin)
+    1, math.sqrt(fout / fin),
 )
 SPECTRAL_LR = lambda fin, fout: fout / fin
 
@@ -116,7 +116,7 @@ class Ezmup:
 
                 else:
                     raise NotImplementedError(
-                        f"Could not find {param_classname} in LAYER_REGISTRY"
+                        f"Could not find {param_classname} in LAYER_REGISTRY",
                     )
 
             else:
@@ -149,12 +149,12 @@ class Ezmup:
         for name, named_module in self.model.named_modules():
             if hasattr(named_module, "weight"):
                 named_module.weight = torch.nn.Parameter(
-                    new_param_dict[name + ".weight"], requires_grad=True
+                    new_param_dict[name + ".weight"], requires_grad=True,
                 ).to(dtype=named_module.weight.dtype)
 
             if hasattr(named_module, "bias"):
                 named_module.bias = torch.nn.Parameter(
-                    new_param_dict[name + ".bias"], requires_grad=True
+                    new_param_dict[name + ".bias"], requires_grad=True,
                 ).to(dtype=named_module.bias.dtype)
 
         self.model.to(dtype=dtype, device=device)
@@ -202,7 +202,8 @@ def covoffdiag(x):
         x: If it has shape [..., d], then it's treated as
             a collection of d-dimensional vectors
     Output:
-        Off-diagonal entries of `cov(x)` in a vector."""
+    Off-diagonal entries of `cov(x)` in a vector.
+    """
     c = cov(x)
     return c[~torch.eye(c.shape[0], dtype=bool)]
 
@@ -221,7 +222,7 @@ FDICT = {
 
 
 def convert_fdict(d):
-    """convert a dict `d` with string values to function values.
+    """Convert a dict `d` with string values to function values.
     Input:
         d: a dict whose values are either strings or functions
     Output:
@@ -229,12 +230,12 @@ def convert_fdict(d):
         converted to functions using `FDICT`.
     """
     return dict(
-        [((k, FDICT[v]) if isinstance(v, str) else (k, v)) for k, v in d.items()]
+        [((k, FDICT[v]) if isinstance(v, str) else (k, v)) for k, v in d.items()],
     )
 
 
 def _record_coords(
-    records, width, modulename, t, output_fdict=None, input_fdict=None, param_fdict=None
+    records, width, modulename, t, output_fdict=None, input_fdict=None, param_fdict=None,
 ):
     """Returns a forward hook that records coordinate statistics.
 
@@ -315,7 +316,7 @@ def _record_coords(
                     _d[fname] = f(x).item()
                 records.append(_d)
             else:
-                raise NotImplemented(f"Unexpected output type: {type(x)}")
+                raise NotImplementedError(f"Unexpected output type: {type(x)}")
 
         with torch.no_grad():
             ret = {"width": width, "module": modulename, "t": t}
@@ -337,7 +338,7 @@ def _record_coords(
                     _ret[fname] = f(output).item()
                 records.append(_ret)
             else:
-                raise NotImplemented(f"Unexpected output type: {type(output)}")
+                raise NotImplementedError(f"Unexpected output type: {type(output)}")
 
             # input stats
             if input_fdict:
@@ -357,7 +358,7 @@ def _record_coords(
                         _ret[fname] = f(input).item()
                     records.append(_ret)
                 else:
-                    raise NotImplemented(f"Unexpected output type: {type(input)}")
+                    raise NotImplementedError(f"Unexpected output type: {type(input)}")
 
             # param stats
             if param_fdict:
@@ -405,8 +406,8 @@ def get_coord_data(
                                 output_fdict=None,
                                 input_fdict=None,
                                 param_fdict=None,
-                            )
-                        )
+                            ),
+                        ),
                     )
 
                 model_engine.model.train()
@@ -438,8 +439,7 @@ def plot_coord_data(
     jitter=True,
     jitter_strength=0.1,
 ):
-    """
-    Plot coord check data `df`.
+    """Plot coord check data `df`.
 
     Input:
         df: pandas DataFrame

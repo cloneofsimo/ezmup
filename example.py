@@ -27,7 +27,7 @@ class MyModel(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim, num_layers):
         super(MyModel, self).__init__()
         self.layers = nn.ModuleList(
-            [AttentionLayer(hidden_dim) for _ in range(num_layers)]
+            [AttentionLayer(hidden_dim) for _ in range(num_layers)],
         )
         self.fin = nn.Linear(input_dim, hidden_dim)
         self.fout = nn.Linear(hidden_dim, output_dim)
@@ -43,9 +43,7 @@ class MyModel(nn.Module):
         return x
 
 
-model = MyModel(
-    input_dim=41, output_dim=41, hidden_dim=47, num_layers=4
-)
+model = MyModel(input_dim=41, output_dim=41, hidden_dim=47, num_layers=4)
 model.to("cuda:0")
 
 mup_engine = Ezmup(47, model, init_std=1.0)
