@@ -34,6 +34,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "black",
+    "myst-parser",
     "ruff",
     "pip-tools",
     "pip-autoremove",
@@ -41,6 +42,8 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-html",
+    "sphinx",
+    "sphinxcontrib-youtube",
 ]
 
 [build-system]
