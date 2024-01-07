@@ -106,6 +106,7 @@ exclude = [
     "data",
 ]
 ignore = [
+    "D100",
     "B017",
     "C408",
     "C901",
@@ -115,6 +116,8 @@ ignore = [
     "F403",
     "F811",
     "F841",
+    "FBT002",
+    "PD901",
 ]
 select = [
     "ARG",  # flake8-unused-arguments
