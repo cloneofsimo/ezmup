@@ -1,11 +1,11 @@
 [project]
 name = "ezmup"   # Change this
-version = "0.1.0"   # Change this
+version = "0.0.1"   # Change this
 description = "Really Easy MuP" # Change this
 readme = "README.md"
 license = {file="LICENSE"}
 authors = [
-    {name="Jongsu Liam Kim", email="jongsukim8@gmail.com"}
+    {name="Simo Ryu", email="cloneofsimo@gmail.com"}
 ]
 dependencies = [
     "matplotlib",
