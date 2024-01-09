@@ -1,18 +1,26 @@
 import math
 from copy import copy
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from torch import nn
 from torch.optim import Adam
 
-SPECTRAL_SIGMA = lambda fin, fout, initstd: (initstd / math.sqrt(fin)) * min(
-    1, math.sqrt(fout / fin)
-)
-SPECTRAL_LR = lambda fin, fout: fout / fin
 
-SPECTRAL_DEFAULT = (SPECTRAL_SIGMA, SPECTRAL_LR)
+def spectral_sigma(fan_in, fan_out, init_std):
+    """Spectral parameterization from the [paper](https://arxiv.org/abs/2310.17813)."""
+    return (init_std / math.sqrt(fan_in)) * min(1, math.sqrt(fan_out / fan_in))
+
+
+def spectral_lr(fan_in, fan_out):
+    """Spectral parameterization from the [paper](https://arxiv.org/abs/2310.17813)."""
+    return fan_out / fan_in
+
+
+SPECTRAL_DEFAULT = (spectral_sigma, spectral_lr)
 
 
 LAYER_REGISTRY = {
@@ -41,7 +49,16 @@ LAYER_REGISTRY = {
 
 
 class Ezmup:
-    def __init__(self, width_basis, model, init_std=1.0):
+    """Easier maximal update parametrization(muP)."""
+
+    def __init__(self, width_basis: int, model: nn.Module, init_std: float = 1.0):
+        """Initialize Ezmup by specifying the width basis, the model, and the init_std.
+
+        Args:
+            width_basis (int): A Base dimension.
+            model (nn.Module): A model to be changed.
+            init_std (float, optional): The initial standard deviation of the model parameters. Defaults to 1.0.
+        """
         self.width_basis = width_basis
         self.model = model
         self.init_std = init_std  # Can be a float or a dict
@@ -51,7 +68,16 @@ class Ezmup:
         self.lr_scaling_dict = {}
 
     @torch.no_grad()
-    def change_width_as(self, new_width):
+    def change_width_as(self, new_width: int):
+        """Update model parameters with new width multiplier.
+
+        Args:
+            new_width (int): Width multiplier used for calculating μP scaling.
+
+        Raises:
+            ValueError: When the module with the name is not found.
+            NotImplementedError: When the parameter class is not found in the LAYER_REGISTRY.
+        """
         new_param_dict = {}
         dtype, device = (
             self.model.parameters().__next__().dtype,
@@ -90,7 +116,9 @@ class Ezmup:
                 module_with_name = self.model.get_submodule(oname)
 
                 if module_with_name is None:
-                    raise ValueError(f"Could not find module with name {name}")
+                    # Exceptions must not be used with f-strings
+                    msg = f"Could not find module with name {name}"
+                    raise ValueError(msg)
 
                 module_class = module_with_name.__class__.__name__
                 param_classname = module_class + ".bias"
@@ -115,9 +143,9 @@ class Ezmup:
                         fan_out = np.prod(weight_shape[:-1])
 
                 else:
-                    raise NotImplementedError(
-                        f"Could not find {param_classname} in LAYER_REGISTRY"
-                    )
+                    # Exceptions must not be used with f-strings
+                    msg = f"Could not find {param_classname} in LAYER_REGISTRY"
+                    raise NotImplementedError(msg)
 
             else:
                 # we don't recognize this parameter : it is not a bias or a weight.
@@ -149,17 +177,29 @@ class Ezmup:
         for name, named_module in self.model.named_modules():
             if hasattr(named_module, "weight"):
                 named_module.weight = torch.nn.Parameter(
-                    new_param_dict[name + ".weight"], requires_grad=True
+                    new_param_dict[name + ".weight"],
+                    requires_grad=True,
                 ).to(dtype=named_module.weight.dtype)
 
             if hasattr(named_module, "bias"):
                 named_module.bias = torch.nn.Parameter(
-                    new_param_dict[name + ".bias"], requires_grad=True
+                    new_param_dict[name + ".bias"],
+                    requires_grad=True,
                 ).to(dtype=named_module.bias.dtype)
 
         self.model.to(dtype=dtype, device=device)
 
-    def get_optimizer(self, optimizer_class, lr, **kwargs):
+    def get_optimizer(self, optimizer_class: Any, lr: float, **kwargs):
+        """Get an optimizer for the model.
+
+        Args:
+            optimizer_class (Any): Optimizer class.
+            lr (float): Learning rate.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            Any: Updated optimizer.
+        """
         mup_scaling = self.lr_scaling_dict
 
         optimizer_groups = [
@@ -175,16 +215,19 @@ class Ezmup:
         return self.init_std
 
     def forward(self, *args, **kwargs):
+        """Forward pass of the model."""
         pass
 
 
-def cov(x):
+def cov(x: torch.Tensor) -> torch.Tensor:
     """Treat `x` as a collection of vectors and its Gram matrix.
-    Input:
-        x: If it has shape [..., d], then it's treated as
+
+    Args:
+        x (torch.Tensor): If it has shape [..., d], then it's treated as
             a collection of d-dimensional vectors
-    Output:
-        cov: a matrix of size N x N where N is the product of
+
+    Returns:
+        torch.Tensor: a matrix of size N x N where N is the product of
             the non-last dimensions of `x`.
     """
     if x.nelement() == 1:
@@ -196,13 +239,16 @@ def cov(x):
     return xx @ xx.T / width
 
 
-def covoffdiag(x):
+def covoffdiag(x: torch.Tensor) -> torch.Tensor:
     """Get off-diagonal entries of `cov(x)` in a vector.
-    Input:
-        x: If it has shape [..., d], then it's treated as
+
+    Args:
+        x (torch.Tensor): If it has shape [..., d], then it's treated as
             a collection of d-dimensional vectors
-    Output:
-        Off-diagonal entries of `cov(x)` in a vector."""
+
+    Returns:
+        torch.Tensor: Off-diagonal entries of `cov(x)` in a vector.
+    """
     c = cov(x)
     return c[~torch.eye(c.shape[0], dtype=bool)]
 
@@ -220,21 +266,29 @@ FDICT = {
 }
 
 
-def convert_fdict(d):
-    """convert a dict `d` with string values to function values.
-    Input:
-        d: a dict whose values are either strings or functions
-    Output:
-        a new dict, with the same keys as `d`, but the string values are
+def convert_fdict(d: dict[Any, Any]) -> dict[Any, Any]:
+    """Convert a dict `d` with string values to function values.
+
+    Args:
+        d (dict[Any, Any]): a dict whose values are either strings or functions
+
+    Returns:
+        dict[Any, Any]: a new dict, with the same keys as `d`, but the string values are
         converted to functions using `FDICT`.
     """
     return dict(
-        [((k, FDICT[v]) if isinstance(v, str) else (k, v)) for k, v in d.items()]
+        [((k, FDICT[v]) if isinstance(v, str) else (k, v)) for k, v in d.items()],
     )
 
 
 def _record_coords(
-    records, width, modulename, t, output_fdict=None, input_fdict=None, param_fdict=None
+    records,
+    width,
+    modulename,
+    t,
+    output_fdict=None,
+    input_fdict=None,
+    param_fdict=None,
 ):
     """Returns a forward hook that records coordinate statistics.
 
@@ -266,40 +320,34 @@ def _record_coords(
     `param_fdict = {}`, i.e., only the average coordinate size (`l1`) of the
     output activations are recorded.
 
-    Inputs:
-        records:
-            list to append coordinate data to
-        width:
-            width of the model. This is used only for plotting coord check later
+    Args:
+        records: list to append coordinate data to.
+        width: width of the model. This is used only for plotting coord check later
             on, so it can be any notion of width.
-        modulename:
-            string name of the module. This is used only for plotting coord check.
-        t:
-            timestep of training. This is used only for plotting coord check.
-        output_fdict, input_fdict, param_fdict:
-            dicts with string keys and whose values can either be functions or
-            strings. The string values are converted to functions via
-            `convert_fdict`
-    Output:
-        a forward hook that records statistics regarding the output, input,
+        modulename: string name of the module. This is used only for plotting coord check.
+        t: timestep of training. This is used only for plotting coord check.
+        output_fdict: dict with string keys and whose values can either be functions or strings.
+            The string values are converted to functions via `convert_fdict`.
+        input_fdict: dict with string keys and whose values can either be functions or strings.
+            The string values are converted to functions via `convert_fdict`.
+        param_fdict: dict with string keys and whose values can either be functions or strings.
+            The string values are converted to functions via `convert_fdict`.
+
+    Returns:
+        Any: a forward hook that records statistics regarding the output, input,
         and/or parameters of a `nn.Module`, as discussed above.
     """
     if output_fdict is None:
         output_fdict = dict(l1=FDICT["l1"])
     else:
         output_fdict = convert_fdict(output_fdict)
-    if input_fdict is None:
-        input_fdict = {}
-    else:
-        input_fdict = convert_fdict(input_fdict)
-    if param_fdict is None:
-        param_fdict = {}
-    else:
-        param_fdict = convert_fdict(param_fdict)
+    # SIM108: Use the ternary operator if it's reasonable
+    input_fdict = {} if input_fdict is None else convert_fdict(input_fdict)
+    param_fdict = {} if param_fdict is None else convert_fdict(param_fdict)
 
     def f(module, input, output):
         def get_stat(d, x, fdict):
-            if isinstance(x, (tuple, list)):
+            if isinstance(x, tuple | list):
                 for i, _x in enumerate(x):
                     _d = copy(d)
                     _d["module"] += f"[{i}]"
@@ -315,13 +363,14 @@ def _record_coords(
                     _d[fname] = f(x).item()
                 records.append(_d)
             else:
-                raise NotImplemented(f"Unexpected output type: {type(x)}")
+                msg = f"Unexpected output type: {type(x)}"
+                raise NotImplementedError(msg)
 
         with torch.no_grad():
             ret = {"width": width, "module": modulename, "t": t}
 
             # output stats
-            if isinstance(output, (tuple, list)):
+            if isinstance(output, tuple | list):
                 for i, out in enumerate(output):
                     _ret = copy(ret)
                     _ret["module"] += f":out[{i}]"
@@ -337,11 +386,12 @@ def _record_coords(
                     _ret[fname] = f(output).item()
                 records.append(_ret)
             else:
-                raise NotImplemented(f"Unexpected output type: {type(output)}")
+                msg = f"Unexpected output type: {type(output)}"
+                raise NotImplementedError(msg)
 
             # input stats
             if input_fdict:
-                if isinstance(input, (tuple, list)):
+                if isinstance(input, tuple | list):
                     for i, out in enumerate(input):
                         _ret = copy(ret)
                         _ret["module"] += f":in[{i}]"
@@ -357,7 +407,8 @@ def _record_coords(
                         _ret[fname] = f(input).item()
                     records.append(_ret)
                 else:
-                    raise NotImplemented(f"Unexpected output type: {type(input)}")
+                    msg = f"Unexpected output type: {type(input)}"
+                    raise NotImplementedError(msg)
 
             # param stats
             if param_fdict:
@@ -374,13 +425,31 @@ def _record_coords(
 def get_coord_data(
     model_engine,
     datapoint,
-    width_list=[64, 128, 256, 512, 1024, 2048, 4096, 8192],
+    width_list=None,
     optim_cls=Adam,
     optim_kwargs=None,
     n_seeds=1,
     n_steps=3,
-):
+) -> pd.DataFrame:
+    """Get coordinate data for coord check.
+
+    Args:
+        model_engine (_type_): Ezmup model engine.
+        datapoint (_type_): A datapoint to be used for forward pass.
+        width_list (list, optional): _description_. Defaults to [64, 128, 256, 512, 1024, 2048, 4096, 8192].
+        optim_cls (_type_, optional): _description_. Defaults to Adam.
+        optim_kwargs (_type_, optional): _description_. Defaults to None.
+        n_seeds (int, optional): _description_. Defaults to 1.
+        n_steps (int, optional): _description_. Defaults to 3.
+
+    Returns:
+        pd.DataFrame: A dataframe containing the coordinate data.
+    """
     df = []
+
+    # Mutable default arguments are dangerous. Use None instead.
+    if width_list is None:
+        width_list = [64, 128, 256, 512, 1024, 2048, 4096, 8192]
 
     for i in range(n_seeds):
         torch.manual_seed(i)
@@ -405,8 +474,8 @@ def get_coord_data(
                                 output_fdict=None,
                                 input_fdict=None,
                                 param_fdict=None,
-                            )
-                        )
+                            ),
+                        ),
                     )
 
                 model_engine.model.train()
@@ -438,10 +507,9 @@ def plot_coord_data(
     jitter=True,
     jitter_strength=0.1,
 ):
-    """
-    Plot coord check data `df`.
+    """Plot coord check data `df`.
 
-    Input:
+    Args:
         df: pandas DataFrame
         y: column for y-axis. Default: 'l1'
         save_to: path to save the figure, or None. Default: None.
@@ -454,13 +522,17 @@ def plot_coord_data(
         loglog: use loglog scale. Default: True
         logbase: log base if using loglog. Default: 2
         face_color: background color of the plot. Default: None
-    Output:
+        jitter: Whether to apply jitter to the y-axis. Default: True
+        jitter_strength: The strength of the jitter. Default: 0.1
+
+    Returns:
         the matplotlib figure object
     """
 
     def apply_jitter(values, jitter_strength):
         # Apply a random multiplicative shift to each data point
-        jitter = np.random.uniform(-jitter_strength, jitter_strength, size=len(values))
+        rng = np.random.default_rng()
+        jitter = rng.uniform(-jitter_strength, jitter_strength, size=len(values))
         return values * np.exp(jitter)
 
     # Preprocessing

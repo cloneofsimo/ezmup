@@ -1,4 +1,4 @@
-# Minimal Implementation of muP (Maximal Update Parametrization) that happens to be also Easy 
+# Minimal Implementation of muP (Maximal Update Parametrization) that happens to be also Easy
 
 > This is radical implementation of the muP algorithm (Maximal Update Parametrization) for the paper [Tensor Programs V: Tuning Large Neural Networks via Zero-Shot Hyperparameter Transfer](https://arxiv.org/abs/2203.03466) and [A Spectral Condition for Feature Learning](https://arxiv.org/abs/2310.17813), series of research driven by [Greg Yang](https://thegregyang.com/). *This is not an official implementation, which can be found [here](https://github.com/microsoft/mup).*
 
@@ -62,7 +62,7 @@ Oh well, this is exactly how you use this package! The code is very minimal, so 
 ## Installation
 
 ```bash
-pip install ezmup+https://github.com/cloneofsimo/ezmup.git
+python3 -m pip install ezmup+https://github.com/cloneofsimo/ezmup.git
 ```
 
 ## Other methods:
@@ -113,3 +113,25 @@ You can see how to run the coord checking in the `example.py` file. The result s
 
 ![Alt text](contents/coord-check.png)
 
+
+# For Developers
+## Installation
+
+```bash
+git clone https://github.com/cloneofsimo/ezmup.git
+cd ezmup
+python3 -m pip install ".[dev]"
+```
+
+## Build docs
+```bash
+sphinx-apidoc -f -o docs/source ezmup
+cd docs
+make html
+```
+
+## Update `requirements.txt` and `requirements-dev.txt` from `pyproject.toml` (Use `pip-compile`)
+```bash
+pip-compile -o requirements.txt pyproject.toml
+pip-compile --extra dev -o requirements-dev.txt pyproject.toml
+```
