@@ -62,7 +62,7 @@ Oh well, this is exactly how you use this package! The code is very minimal, so 
 ## Installation
 
 ```bash
-python3 -m pip install ezmup+https://github.com/cloneofsimo/ezmup.git
+python3 -m pip install git+https://github.com/cloneofsimo/ezmup.git
 ```
 
 ## Other methods:
